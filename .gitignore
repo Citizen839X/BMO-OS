@@ -1,0 +1,23 @@
+# Python bytecode (compiled files)
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Environments
+.venv/
+venv/
+ENV/
+
+# OS generated files
+.DS_Store
+.directory
+*.swp
+
+# BMO Specific temporary files
+/dev/shm/bmo_listening
+/dev/shm/bmo_temp.wav
+/dev/shm/bmo_voice.wav
+
+# Local memory/logs (optional: keep if you want to share your memory, 
+# but usually better to let the user create their own)
+bmo_memory.txt
