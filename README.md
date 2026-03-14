@@ -94,3 +94,16 @@ However, I am seeking expertise in **PipeWire/PulseAudio** integration for a sea
 
 ---
 **"BMO is more than a computer. BMO is family."** 💚
+
+## 🖥️ BMO in Action (XFCE + Cortile)
+
+BMO is perfectly integrated into the **openSUSE Tumbleweed** environment using **XFCE (X11)**. 
+The following screenshots showcase the seamless integration with the **Cortile Tile Manager**, 
+the **Global Menu** support, and BMO's advanced interaction capabilities.
+
+## Screenshots
+
+| | | |
+|:---:|:---:|:---:|
+| ![sc_01](screenshots/sc_01.png) | ![sc_02](screenshots/sc_02.png) | ![sc_03](screenshots/sc_03.png) |
+| ![sc_04](screenshots/sc_04.png) | ![sc_05](screenshots/sc_05.png) | ![sc_06](screenshots/sc_06.png) |
