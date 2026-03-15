@@ -38,11 +38,10 @@ However, I am seeking expertise in **PipeWire/PulseAudio** integration for a sea
 **"BMO is more than a computer. BMO is family."** 💚
 
 ## 📸 Gallery
-Check out BMO-OS in action:
 
-![BMO Screen 01](screenshots/sc_01.png)
-![BMO Screen 02](screenshots/sc_02.png)
-![BMO Screen 03](screenshots/sc_03.png)
-![BMO Screen 04](screenshots/sc_04.png)
-![BMO Screen 05](screenshots/sc_05.png)
-![BMO Screen 06](screenshots/sc_06.png)
+| | | |
+|:---:|:---:|:---:|
+| ![BMO 01](screenshots/sc_01.png) | ![BMO 02](screenshots/sc_02.png) | ![BMO 03](screenshots/sc_03.png) |
+| ![BMO 04](screenshots/sc_04.png) | ![BMO 05](screenshots/sc_05.png) | ![BMO 06](screenshots/sc_06.png) |
+
+---
