@@ -38,9 +38,9 @@ VOICES_DIR = os.path.join(BASE_DIR, "voices")
 
 PIPER_CMD = os.path.join(BASE_DIR, "piper", "piper") 
 MODEL_PATH = os.path.join(VOICES_DIR, "en_US-amy-medium.onnx")
-MEMORY_FILE = os.path.expanduser("~/.config/bmo-os/bmo_memory.txt")
+MEMORY_FILE = os.path.join(BASE_DIR, "bmo_memory.txt")
 TRIGGER_FILE = "/dev/shm/bmo_listening"
-TEXT_MODEL = "BMO"
+TEXT_MODEL = "gemma3:4b"
 VISION_MODEL = "gemma3:4b"
 import logging
 
@@ -75,21 +75,26 @@ STYLE: Cute, short, joyful. Use 'sugarplum', 'honeybun' or 'dear'."""
 # --- HARDWARE UTILITIES ---
 
 def get_smart_hardware_profile():
+    # Detect the number of available CPU threads
     total_threads = os.cpu_count() or 4
     if total_threads >= 16:
         optimal_threads = 10 
     elif total_threads >= 12:
         optimal_threads = 8
     else:
+        # Leave at least one thread free for the OS/UI
         optimal_threads = max(2, total_threads - 1)
     return {"threads": optimal_threads, "label": f"{total_threads}T System"}
 
+# Initialize the profile globally to avoid NameError in other functions
+HW_PROFILE = get_smart_hardware_profile()
+
 def apply_hardware_config():
-    profile = get_smart_hardware_profile()
-    os.environ["OMP_NUM_THREADS"] = str(profile["threads"])
-    logger.info(f"Hardware Adaptation - Platform: {profile['label']} | Threads: {profile['threads']}")
+    # Set environment variables to optimize CPU usage and prevent stuttering
+    os.environ["OMP_NUM_THREADS"] = str(HW_PROFILE["threads"])
+    logger.info(f"Hardware Adaptation - Platform: {HW_PROFILE['label']} | Threads: {HW_PROFILE['threads']}")
     print(f"\n[BMO HARDWARE ADAPTATION]")
-    print(f"PLATFORM: {profile['label']}")
+    print(f"PLATFORM: {HW_PROFILE['label']}")
     print(f"STRATEGY: Balanced Cache (Anti-Stutter active)")
     print(f"-------------------------------------------\n")
 
@@ -442,26 +447,36 @@ class BMOWindow(QMainWindow):
 
             now = datetime.now()
             time_ctx = f"[SYSTEM DATE/TIME: {now.strftime('%A, %B %d, %Y %H:%M')}]"
-            context_data = f"\n{time_ctx}\n[WEB DATA]: {web_data}" if web_data else f"\n{time_ctx}"
+            
+            safe_bmo_prompt = BMO_PROMPT if 'BMO_PROMPT' in globals() else ""
+            safe_memory = getattr(self, 'memory_context', "")
+            safe_web = web_data if 'web_data' in locals() and web_data else ""
+            
+            context_data = f"\n{time_ctx}\n[WEB DATA]: {safe_web}" if safe_web else f"\n{time_ctx}"
+            
             vision_context = ""
             if image_path:
-                with Image.open(image_path) as img:
-                    img = img.convert("RGB"); img.thumbnail((384, 384)); img_byte_arr = io.BytesIO()
-                    img.save(img_byte_arr, format='JPEG', quality=70)
-                    res = ollama.generate(model=VISION_MODEL, prompt="What do you see?", images=[img_byte_arr.getvalue()])
-                    vision_context = f"[IMAGE DESC: {res.get('response', '')}]"
-            
-            full_prompt = f"{BMO_PROMPT}\n\n{context_data}\nHistory: {self.memory_context}\n{vision_context}\n: {prompt}\nBMO:"
-            hw_profile = get_smart_hardware_profile() 
-            
+                try:
+                    with Image.open(image_path) as img:
+                        img = img.convert("RGB"); img.thumbnail((384, 384)); img_byte_arr = io.BytesIO()
+                        img.save(img_byte_arr, format='JPEG', quality=70)
+                        res_v = ollama.generate(model=VISION_MODEL, prompt="What do you see?", images=[img_byte_arr.getvalue()])
+                        vision_context = f"[IMAGE DESC: {res_v.get('response', '')}]"
+                except:
+                    vision_context = "[IMAGE ERROR]"
+
+            full_prompt = f"{safe_bmo_prompt}\n\n{context_data}\nHistory: {safe_memory}\n{vision_context}\nUser: {prompt}\nBMO:"
+
+            client = ollama.Client(host="http://localhost:11434", timeout=300.0)
+
             res = ollama.generate(
                 model=TEXT_MODEL, 
                 prompt=full_prompt, 
                 options={
                     "num_predict": 1024, 
                     "temperature": 0.6, 
-                    "num_ctx": 8192,
-                    "num_thread": hw_profile['threads']
+                    "num_ctx": 4096, # Reduced context slightly for better speed
+                    "num_thread": HW_PROFILE["threads"]
                 }
             )
             
@@ -473,7 +488,7 @@ class BMOWindow(QMainWindow):
             
             self.signals.response_ready.emit(resp, is_special)
             duration = time.time() - start_time
-            print(f"\n[BMO PERFORMANCE] Time: {duration:.2f}s | Threads: {hw_profile['threads']}")
+            print(f"\n[BMO PERFORMANCE] Time: {duration:.2f}s | Threads: {HW_PROFILE['threads']}")
 
         except Exception as e:
             if not self.interrupt_event.is_set():
@@ -518,9 +533,11 @@ class BMOWindow(QMainWindow):
 
             # 3. Final Cleaning for Piper
             speech_final = re.sub(r'\[.*?\]', '', speech_final)
+            speech_final = re.sub(r'\(.*?\)', '', speech_final)
+            speech_final = re.sub(r'[^\x00-\x7F]+', '', speech_final)
             speech_final = re.sub(r'[●◡ᗜ♥\-▬]+', '', speech_final)
-            speech_final = re.sub(r'[*_#()\[\]]', '', speech_final)
-            speech_final = " ".join(speech_final.split()) 
+            speech_final = re.sub(r'[*_#]', '', speech_final)
+            speech_final = " ".join(speech_final.split())
             
             t_wav = f"/dev/shm/bmo_t_{random.randint(100,999)}.wav"
             p_wav = f"/dev/shm/bmo_v_{random.randint(100,999)}.wav"
