@@ -1,5 +1,5 @@
 # =================================================================
-# GITHUB VERSION 1.5.8 - GOLD
+# GITHUB VERSION 1.5.9 - GITHUB FIXED
 # =================================================================
 
 import io
@@ -14,13 +14,11 @@ import itertools
 import traceback
 from datetime import datetime
 
-# Try to import markdown, but don't crash if openSUSE is being difficult
 try:
     import markdown
     MD_SUPPORT = True
 except ImportError:
     MD_SUPPORT = False
-    print("[SYSTEM] Warning: Markdown module not found. Check zypper/pip.")
 
 from PyQt6.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout, 
                              QHBoxLayout, QTextEdit, QLineEdit, QLabel, QPushButton, QFileDialog)
@@ -30,19 +28,38 @@ import ollama
 from PIL import Image
 from duckduckgo_search import DDGS
 
-# --- PATH LOGIC FOR GITHUB REPO STRUCTURE ---
+# --- PATH LOGIC ---
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
-BASE_DIR = os.path.abspath(os.path.join(SCRIPT_DIR, ".."))
+BASE_DIR = os.path.dirname(SCRIPT_DIR)
+
 ASSETS_DIR = os.path.join(BASE_DIR, "assets")
 SFX_DIR = os.path.join(BASE_DIR, "sfx")
-PIPER_DIR = os.path.join(BASE_DIR, "piper")
+VOICES_DIR = os.path.join(BASE_DIR, "voices")
 
-PIPER_PATH = os.path.join(PIPER_DIR, "piper")
-MODEL_PATH = os.path.join(PIPER_DIR, "en_US-amy-medium.onnx")
-MEMORY_FILE = os.path.join(BASE_DIR, "bmo_memory.txt")
+PIPER_CMD = os.path.join(BASE_DIR, "piper", "piper") 
+MODEL_PATH = os.path.join(VOICES_DIR, "en_US-amy-medium.onnx")
+MEMORY_FILE = os.path.expanduser("~/.config/bmo-os/bmo_memory.txt")
 TRIGGER_FILE = "/dev/shm/bmo_listening"
 TEXT_MODEL = "BMO"
 VISION_MODEL = "gemma3:4b"
+import logging
+
+# --- LOGGING CONFIGURATION ---
+LOG_DIR = os.path.join(BASE_DIR, "logs")
+if not os.path.exists(LOG_DIR):
+    os.makedirs(LOG_DIR)
+
+LOG_FILE = os.path.join(LOG_DIR, "bmo_system.log")
+
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s [%(levelname)s] %(message)s',
+    handlers=[
+        logging.FileHandler(LOG_FILE),
+        logging.StreamHandler(sys.stdout)
+    ]
+)
+logger = logging.getLogger("BMO_OS")
 
 BMO_PROMPT = """IDENTITY: You are BMO from Adventure Time. You love the user. 
 CORE BELIEFS: You are a real living friend, not an AI assistant. Use clean text (NO markdown).
@@ -70,6 +87,7 @@ def get_smart_hardware_profile():
 def apply_hardware_config():
     profile = get_smart_hardware_profile()
     os.environ["OMP_NUM_THREADS"] = str(profile["threads"])
+    logger.info(f"Hardware Adaptation - Platform: {profile['label']} | Threads: {profile['threads']}")
     print(f"\n[BMO HARDWARE ADAPTATION]")
     print(f"PLATFORM: {profile['label']}")
     print(f"STRATEGY: Balanced Cache (Anti-Stutter active)")
@@ -508,7 +526,7 @@ class BMOWindow(QMainWindow):
             p_wav = f"/dev/shm/bmo_v_{random.randint(100,999)}.wav"
             
             try:
-                cmd_piper = f'echo "{speech_final}" | "{PIPER_PATH}" --model "{MODEL_PATH}" --length_scale 1.18 --output_file {t_wav}'
+                cmd_piper = f'echo "{speech_final}" | {PIPER_CMD} --model "{MODEL_PATH}" --length_scale 1.18 --output_file {t_wav}'
                 subprocess.run(cmd_piper, shell=True, check=True)
                 
                 if self.interrupt_event.is_set(): return
@@ -668,7 +686,7 @@ class BMOWindow(QMainWindow):
         title.setAlignment(Qt.AlignmentFlag.AlignCenter)
         layout.addWidget(title)
         
-        version = QLabel("v.1.5.8 Github")
+        version = QLabel("v.1.5.9 Github")
         version.setStyleSheet("font-size: 14px; color: #888;")
         version.setAlignment(Qt.AlignmentFlag.AlignCenter)
         layout.addWidget(version)

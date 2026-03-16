@@ -18,6 +18,9 @@ ENV/
 /dev/shm/bmo_temp.wav
 /dev/shm/bmo_voice.wav
 
-# Local memory/logs (optional: keep if you want to share your memory, 
-# but usually better to let the user create their own)
+# Local memory/logs 
 bmo_memory.txt
+
+# LOGS
+logs/
+*.log

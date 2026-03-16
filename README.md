@@ -1,4 +1,4 @@
-# 📟 BMO OS - "Adventure Time" Project (v1.5.8 GOLD)
+# 📟 BMO OS - "Adventure Time" Project (v1.5.9 - GitHub Fix)
 
 **Developer:** Carlo Sitaro
 **Host System:** openSUSE Tumbleweed/Leap (GNOME 49 Wayland / Xfce X11)
@@ -9,9 +9,10 @@
 BMO-OS is a voice assistant for Linux, specifically designed for Wayland/Sway environments. It integrates local LLMs via Ollama with fast text-to-speech using Piper.
 
 ## 🛠 Current State
-* **Version:** 1.5.8
+* **Version:** 1.5.9
 * **Core:** Python integration between Ollama and Piper TTS.
 * **Compatibility:** Optimized for RPM-based systems (OpenSUSE/Fedora).
+* **InstallerFixes:** Piper dependencies are separated, system log added in BMO/logs/ to better help out in debug mode.
 
 ## 📦 Installation & Setup
 > **Current Status:** The installation script is functional but currently optimized for `zypper`. Robust error handling and multi-distro support are priority targets for upcoming 1.6.x updates.
@@ -25,6 +26,27 @@ Clone the repository and execute the setup script:
 3. chmod +x scripts/setup_bmo.sh
 4. ./scripts/setup_bmo.sh
 
+##🎙️ Text-to-Speech Setup (Piper)
+
+Due to a wise Linux community feedback, the Piper module must be installed separately to ensure system stability and compliance with different distributions.
+
+To enable BMO's voice, follow these simple steps:
+1. Download Piper - Download the latest Piper binary for your architecture (usually amd64) from the official Piper releases.
+2. Manual Placement - Extract the archive and place the piper executable inside the project folder as follows:
+Plaintext
+
+BMO/
+└── piper/
+    └── piper  <-- (The executable goes here)
+
+3. Voice Model
+
+Download a .onnx voice file (we recommend en_US-amy-medium) and its corresponding .json from the Piper Voice Gallery. Place them here:
+
+BMO/
+└── voices/
+    ├── en_US-amy-medium.onnx
+    └── en_US-amy-medium.onnx.json
 ---
 
 ## 🤝 Special Contributor's Note: PTT (Push To Talk) Implementation

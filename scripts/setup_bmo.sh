@@ -22,7 +22,7 @@ DESKTOP_FILE="$HOME/.local/share/applications/bmo.desktop"
 
 # [1/5] System dependencies
 echo "[1/5] Installing system dependencies..."
-sudo zypper in -y espeak-ng libasound2 pulseaudio-utils sox python311-PyQt6
+sudo zypper in -y espeak-ng libasound2 pulseaudio-utils sox python311-PyQt6 python311-Pillow
 
 # [2/5] Piper execution rights
 echo "[2/5] Setting permissions for Piper..."
@@ -37,7 +37,7 @@ fi
 echo "[3/5] Generating .desktop file..."
 cat <<EOF > $DESKTOP_FILE
 [Desktop Entry]
-Version=1.5.8
+Version=1.5.9
 Type=Application
 Name=BMO OS
 Comment=Adventure time AI Assistant
@@ -57,7 +57,7 @@ update-desktop-database ~/.local/share/applications/ 2>/dev/null
 echo "[5/5] Finalizing installation..."
 echo "-------------------------------------------------------"
 echo "✅ BMO Setup Complete in $TARGET_DIR"
-echo "Version: 1.5.8 Gold"
+echo "Version: 1.5.9 GitHub Fix"
 echo "🚀 Search for 'BMO' or 'Adventure time' in your dashboard!"
 echo "-------------------------------------------------------"
 echo "⚠️  IMPORTANT: Remember to start Ollama before running BMO!"
