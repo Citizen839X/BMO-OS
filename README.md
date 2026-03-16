@@ -15,7 +15,7 @@ BMO-OS is a voice assistant for Linux, specifically designed for Wayland/Sway en
 * **InstallerFixes:** Piper dependencies are separated, system log added in BMO/logs/ to better help out in debug mode.
 
 ## 📦 Installation & Setup
-> **Current Status:** The installation script is functional but currently optimized for `zypper`. Robust error handling and multi-distro support are priority targets for upcoming 1.6.x updates.
+> **Current Status:** The installation script is functional but currently optimized for `zypper`. Robust error handling and multi-distro support are priority targets for future updates.
 
 ## 🛠️ Run the Installer
 
