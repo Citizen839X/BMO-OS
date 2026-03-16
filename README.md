@@ -15,7 +15,7 @@ BMO-OS is a voice assistant for Linux, specifically designed for Wayland/Sway en
 * **InstallerFixes:** Piper dependencies are separated, system log added in BMO/logs/ to better help out in debug mode.
 
 ## 📦 Installation & Setup
-> **Current Status:** The installation script is functional but currently optimized for `zypper`. Robust error handling and multi-distro support are priority targets for upcoming 1.6.x updates.
+> **Current Status:** The installation script is functional but currently optimized for `zypper`. Robust error handling and multi-distro support are priority targets for future updates.
 
 ## 🛠️ Run the Installer
 
@@ -31,7 +31,9 @@ Clone the repository and execute the setup script:
 Due to a wise Linux community feedback, the Piper module must be installed separately to ensure system stability and compliance with different distributions.
 
 To enable BMO's voice, follow these simple steps:
+
 1. Download Piper - Download the latest Piper binary for your architecture (usually amd64) from the official Piper releases.
+
 2. Manual Placement - Extract the archive and place the piper executable inside the project folder as follows:
 Plaintext
 
@@ -47,6 +49,7 @@ BMO/
 └── voices/
     ├── en_US-amy-medium.onnx
     └── en_US-amy-medium.onnx.json
+
 ---
 
 ## 🤝 Special Contributor's Note: PTT (Push To Talk) Implementation
