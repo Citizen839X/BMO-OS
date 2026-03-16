@@ -11,20 +11,21 @@ BMO-OS is a voice assistant for Linux, specifically designed for Wayland/Sway en
 ## 🛠 Current State
 * **Version:** 1.5.9
 * **Core:** Python integration between Ollama and Piper TTS.
-* **Compatibility:** Optimized for RPM-based systems (OpenSUSE/Fedora).
+* **Compatibility:** Optimized for RPM-based systems (openSUSE/Fedora). Added Arch and derivate, Debian and derivate compatibility. I have no time to test them under Virtual Machines, so, the feedback is more than welcome!
 * **InstallerFixes:** Piper dependencies are separated, system log added in BMO/logs/ to better help out in debug mode.
-
-## 📦 Installation & Setup
-> **Current Status:** The installation script is functional but currently optimized for `zypper`. Robust error handling and multi-distro support are priority targets for future updates.
 
 ## 🛠️ Run the Installer
 
-Clone the repository and execute the setup script:
+Clone the repository and run the setup script from the root folder to ensure all paths are correctly initialized:
 
-1. git clone https://github.com/Citizen839X/BMO-OS.git
-2. cd BMO-OS
-3. chmod +x scripts/setup_bmo.sh
-4. ./scripts/setup_bmo.sh
+1. `git clone https://github.com/Citizen839X/BMO-OS.git`
+2. `cd BMO-OS`
+3. `chmod +x scripts/setup_bmo.sh`
+4. `./scripts/setup_bmo.sh`
+
+> [!IMPORTANT]
+> Once the installation is complete, BMO will be located in your home directory at `~/BMO`. 
+> All future configurations or manual code edits should be performed in that folder.
 
 ##🎙️ Text-to-Speech Setup (Piper)
 
