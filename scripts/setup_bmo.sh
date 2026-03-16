@@ -20,9 +20,32 @@ MAIN_PY="$TARGET_DIR/src/bmo_final.py"
 ICON_PATH="$TARGET_DIR/assets/bmo_icon.png"
 DESKTOP_FILE="$HOME/.local/share/applications/bmo.desktop"
 
-# [1/5] System dependencies
-echo "[1/5] Installing system dependencies..."
-sudo zypper in -y espeak-ng libasound2 pulseaudio-utils sox python311-PyQt6 python311-Pillow
+# [1/5] System dependencies (Universal Detection)
+echo "[1/5] Detecting OS and installing system dependencies..."
+
+if [ -f /etc/os-release ]; then
+    . /etc/os-release
+    case "$ID" in
+        opensuse*|suse)
+            sudo zypper in -y espeak-ng libasound2 pulseaudio-utils sox python311-PyQt6 python311-Pillow
+            ;;
+        fedora)
+            sudo dnf install -y espeak-ng alsa-lib pulseaudio-utils sox python3-pyqt6 python3-pillow
+            ;;
+        ubuntu|debian|pop|mint)
+            sudo apt-get update && sudo apt-get install -y espeak-ng libasound2 pulseaudio-utils sox python3-pyqt6 python3-pil
+            ;;
+        arch|manjaro)
+            sudo pacman -S --noconfirm espeak-ng alsa-lib libpulse sox python-pyqt6 python-pillow
+            ;;
+        *)
+            echo "⚠️ OS not recognized. Attempting generic install..."
+            sudo zypper in -y espeak-ng libasound2 pulseaudio-utils sox python311-PyQt6 python311-Pillow
+            ;;
+    esac
+else
+    echo "❌ Error: Cannot detect OS. Please install dependencies manually."
+fi
 
 # [2/5] Piper execution rights
 echo "[2/5] Setting permissions for Piper..."
