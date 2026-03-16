@@ -41,7 +41,7 @@ BMO/
 
 3. Voice Model
 
-Download a .onnx voice file (we recommend en_US-amy-medium) and its corresponding .json from the Piper Voice Gallery. Place them here:
+The recommended voice model (en_US-amy-medium) is already included in the /voices folder of this repository for your convenience. If you wish to use a different voice, you can download .onnx files from the Piper Voice Gallery and place them here:
 
 BMO/
 └── voices/
