@@ -7,7 +7,7 @@ CURRENT_PROJECT_ROOT=$(dirname "$SCRIPT_PATH")
 
 echo "● ◡ ● Configuring BMO in $TARGET_DIR..."
 
-# Move files to ~/BMO if executed from elsewhere
+# Relocate files if executed from outside the target directory
 if [ "$CURRENT_PROJECT_ROOT" != "$TARGET_DIR" ]; then
     echo "[0/5] Relocating files to $TARGET_DIR..."
     mkdir -p "$TARGET_DIR"
@@ -25,11 +25,12 @@ echo "[1/5] Detecting OS and installing system dependencies..."
 
 if [ -f /etc/os-release ]; then
     . /etc/os-release
+    # Check both ID and ID_LIKE to support derivatives
     case "$ID" in
         opensuse*|suse)
             sudo zypper in -y espeak-ng libasound2 pulseaudio-utils sox python311-PyQt6 python311-Pillow
             ;;
-        fedora)
+        fedora|rhel)
             sudo dnf install -y espeak-ng alsa-lib pulseaudio-utils sox python3-pyqt6 python3-pillow
             ;;
         ubuntu|debian|pop|mint)
@@ -39,8 +40,17 @@ if [ -f /etc/os-release ]; then
             sudo pacman -S --noconfirm espeak-ng alsa-lib libpulse sox python-pyqt6 python-pillow
             ;;
         *)
-            echo "⚠️ OS not recognized. Attempting generic install..."
-            sudo zypper in -y espeak-ng libasound2 pulseaudio-utils sox python311-PyQt6 python311-Pillow
+            # Fallback check for ID_LIKE field
+            if [[ "$ID_LIKE" == *"suse"* ]]; then
+                sudo zypper in -y espeak-ng libasound2 pulseaudio-utils sox python311-PyQt6 python311-Pillow
+            elif [[ "$ID_LIKE" == *"debian"* ]]; then
+                sudo apt-get update && sudo apt-get install -y espeak-ng libasound2 pulseaudio-utils sox python3-pyqt6 python3-pil
+            elif [[ "$ID_LIKE" == *"arch"* ]]; then
+                sudo pacman -S --noconfirm espeak-ng alsa-lib libpulse sox python-pyqt6 python-pillow
+            else
+                echo "⚠️ OS not recognized. Attempting generic install..."
+                sudo zypper in -y espeak-ng libasound2 pulseaudio-utils sox python311-PyQt6 python311-Pillow
+            fi
             ;;
     esac
 else
@@ -64,7 +74,7 @@ Version=1.5.9
 Type=Application
 Name=BMO OS
 Comment=Adventure time AI Assistant
-Exec=python3 $MAIN_PY
+Exec=bash -c 'cd $TARGET_DIR && python3 $MAIN_PY'
 Icon=$ICON_PATH
 Terminal=false
 Categories=Utility;AI;
