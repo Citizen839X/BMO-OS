@@ -1,18 +1,22 @@
-# 📟 BMO OS - "Adventure Time" Project (v1.5.9 - GitHub Fix)
+# 📟 BMO OS - AI Assistant Project
 
-**Developer:** Carlo Sitaro
-**Host System:** openSUSE Tumbleweed/Leap (GNOME 49 Wayland / Xfce X11)
+**Developer:** Carlo Sitaro  
+**Host System:** openSUSE Tumbleweed/Leap (GNOME 49 Wayland / Xfce X11)  
 **Core:** Python 3.11+ / PyQt6 / Ollama (Gemma 3:4b)
 
 ---
 
-BMO-OS is a voice assistant for Linux, specifically designed for Wayland/Sway environments. It integrates local LLMs via Ollama with fast text-to-speech using Piper.
+BMO-OS is a voice assistant for Linux, specifically designed for Wayland/Sway environments. It integrates local LLMs via Ollama with fast text-to-speech using Piper and real-time hardware monitoring.
 
-## 🛠 Current State
-* **Version:** 1.5.9
-* **Core:** Python integration between Ollama and Piper TTS.
-* **Compatibility:** Optimized for RPM-based systems (openSUSE/Fedora). Added Arch and derivate, Debian and derivate compatibility. I have no time to test them under Virtual Machines, so, the feedback is more than welcome!
-* **InstallerFixes:** Piper dependencies are separated, system log added in BMO/logs/ to better help out in debug mode.
+## 🛠 What's New in v1.6.0
+
+* **Drag & Drop Vision:** BMO now has "eyes" for your files! Support for dragging images (.png, .jpg, .webp) directly into the UI for instant analysis.
+* **Vision Bug Fixes:** Resolved critical issues and race conditions that caused inference crashes or UI hangs during image loading.
+* **Vulkan API Optimization:** Enhanced hardware acceleration support for all major GPUs (Intel Arc, AMD, NVIDIA) ensuring stable performance across different Linux drivers.
+* **Tool Use & Dynamic Hardware Sensing:** BMO now "feels" your computer. It identifies specific Linux drivers (`amdgpu`, `xe`, `i915`, `nouveau`, `nvidia`) to report accurate temperatures for CPU, multiple GPUs, and VRAM.
+* **Smart Context Awareness:** The LLM receives real-time telemetry, allowing BMO to answer specific questions about your hardware health (e.g., "How are the Xe values?").
+* **Multi-GPU UI:** Responsive top-left monitor that scales based on detected hardware, hiding inactive sensors to keep the interface clean.
+* **Performance Optimization:** Hardware-adaptive threading strategy to prevent UI stuttering during heavy LLM inference.
 
 ## 🛠️ Run the Installer
 
@@ -24,23 +28,21 @@ Clone the repository and run the setup script from the root folder to ensure all
 4. `./scripts/setup_bmo.sh`
 
 > [!IMPORTANT]
-> Once the installation is complete, BMO will be located in your home directory at `~/BMO`. 
+> Once the installation is complete, BMO will be located in your home directory at `~/BMO`.  
 > All future configurations or manual code edits should be performed in that folder.
 
-##🎙️ Text-to-Speech Setup (Piper)
+## 🎙️ Text-to-Speech Setup (Piper)
 
-Due to a wise Linux community feedback, the Piper module must be installed separately to ensure system stability and compliance with different distributions.
+Due to wise Linux community feedback, the Piper module must be installed separately to ensure system stability and compliance with different distributions.
 
 To enable BMO's voice, follow these simple steps:
 
-1. Download Piper - Download the latest Piper binary for your architecture (usually amd64) from the official Piper releases.
-
-2. Manual Placement - Extract the archive and place the piper executable inside the project folder as follows:
-Plaintext
-
-BMO/
-└── piper/
-    └── piper  <-- (The executable goes here)
+1. **Download Piper** - Download the latest Piper binary for your architecture (usually amd64) from the official Piper releases.
+2. **Manual Placement** - Extract the archive and place the piper executable inside the project folder:
+   ```plaintext
+   BMO/
+   └── piper/
+       └── piper  <-- (The executable goes here)
 
 3. Voice Model
 

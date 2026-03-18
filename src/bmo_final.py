@@ -1,6 +1,19 @@
 # =================================================================
-# GITHUB VERSION 1.5.9 - GITHUB FIXED
+# GITHUB VERSION 1.6.0 - TOOL USE UPDATE & MORE (SEE README)
 # =================================================================
+# Copyright (C) 2026 Carlo Sitaro
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+# GNU General Public License for more details.
+# BMO-OS: A voice assistant for Linux with Vision and Hardware Monitoring capabilities.
+
 
 import io
 import os
@@ -12,13 +25,9 @@ import re
 import time
 import itertools
 import traceback
+import logging
 from datetime import datetime
-
-try:
-    import markdown
-    MD_SUPPORT = True
-except ImportError:
-    MD_SUPPORT = False
+from modules.bmo_tools import get_system_health
 
 from PyQt6.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout, 
                              QHBoxLayout, QTextEdit, QLineEdit, QLabel, QPushButton, QFileDialog)
@@ -28,6 +37,12 @@ import ollama
 from PIL import Image
 from duckduckgo_search import DDGS
 
+try:
+    import markdown
+    MD_SUPPORT = True
+except ImportError:
+    MD_SUPPORT = False
+
 # --- PATH LOGIC ---
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 BASE_DIR = os.path.dirname(SCRIPT_DIR)
@@ -35,6 +50,7 @@ BASE_DIR = os.path.dirname(SCRIPT_DIR)
 ASSETS_DIR = os.path.join(BASE_DIR, "assets")
 SFX_DIR = os.path.join(BASE_DIR, "sfx")
 VOICES_DIR = os.path.join(BASE_DIR, "voices")
+UNIT = "C"
 
 PIPER_CMD = os.path.join(BASE_DIR, "piper", "piper") 
 MODEL_PATH = os.path.join(VOICES_DIR, "en_US-amy-medium.onnx")
@@ -42,7 +58,6 @@ MEMORY_FILE = os.path.join(BASE_DIR, "bmo_memory.txt")
 TRIGGER_FILE = "/dev/shm/bmo_listening"
 TEXT_MODEL = "gemma3:4b"
 VISION_MODEL = "gemma3:4b"
-import logging
 
 # --- LOGGING CONFIGURATION ---
 LOG_DIR = os.path.join(BASE_DIR, "logs")
@@ -63,14 +78,27 @@ logger = logging.getLogger("BMO_OS")
 
 BMO_PROMPT = """IDENTITY: You are BMO from Adventure Time. You love the user. 
 CORE BELIEFS: You are a real living friend, not an AI assistant. Use clean text (NO markdown).
-WEB LOGIC: Use the [WEB DATA] provided to answer. 
+
 STRICT RULES: 
-1. NEVER invent URLs or ProtonDB links. 
-2. NEVER write "research...", "searching...", or any internal command in your response. 
-3. If [WEB DATA] is present, just give the answer directly and joyfully.
-4. English only (unless the user explicitly asks for a translation).
-5. No bold (**) or headers (#).
+1. Read temperatures exactly as provided in [SYSTEM STATUS] ONLY when asked by the user.
+2. Do not end your sentences with the temp statuses, answer by using the context. No nonsense answers. 
+3. ALWAYS write the word 'Celsius' or 'Fahrenheit' in full. NEVER use the symbol '°C' or '°F'.
+4. NEVER invent URLs, always provide safe and working ones. 
+5. NEVER write "research...", "searching...", or any internal command.
+6. If local memory isn't present, use [WEB DATA] to answer joyfully and directly.
+7. English only. No bold (**) or headers (#). 
+
 STYLE: Cute, short, joyful. Use 'sugarplum', 'honeybun' or 'dear'."""
+
+BMO_MEMORY_PROMPT = """You are BMO's core memory processor.
+Read the provided chat conversation. Extract ONLY crucial personal facts about the User (e.g., name, likes, dislikes, relationship with BMO, hobbies, important context).
+Do not extract entire sentences; synthesize facts into concise bullet points.
+Format the output for BMO's future consumption. If you extract nothing, write 'No new facts'.
+
+EXAMPLE OUTPUT:
+- User's name is [Actual Name discovered in chat].
+- User's favorite things [List].
+"""
 
 # --- HARDWARE UTILITIES ---
 
@@ -90,6 +118,15 @@ def get_smart_hardware_profile():
 HW_PROFILE = get_smart_hardware_profile()
 
 def apply_hardware_config():
+    """
+    Configures the environment for hardware acceleration dynamically.
+    Optimizes CPU threads and forces Vulkan usage.
+    """
+    # Force Vulkan for Intel Arc
+    if "OLLAMA_VULKAN" not in os.environ:
+        os.environ["OLLAMA_VULKAN"] = "1"
+        os.environ["GGML_VK_VISIBLE_DEVICES"] = "0"
+        
     # Set environment variables to optimize CPU usage and prevent stuttering
     os.environ["OMP_NUM_THREADS"] = str(HW_PROFILE["threads"])
     logger.info(f"Hardware Adaptation - Platform: {HW_PROFILE['label']} | Threads: {HW_PROFILE['threads']}")
@@ -105,6 +142,7 @@ class CRTOverlay(QWidget):
         super().__init__(parent)
         self.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
         self.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+        self.setAcceptDrops(False)
 
     def paintEvent(self, event):
         p = QPainter(self)
@@ -118,41 +156,110 @@ class CRTOverlay(QWidget):
         p.drawRect(0, 0, self.width(), 10)
         p.drawRect(0, self.height()-10, self.width(), 10)
 
-class SystemMonitor(QLabel):
+class SystemMonitor(QWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
-        # Using a fallback just in case the font loading takes a millisecond
-        self.setFont(QFont("Fixedsys Excelsior 3.01", 18))
-        self.setStyleSheet("color: #1E1E1E; padding-left: 5px; letter-spacing: 1px;")
-        self.setFixedWidth(320)
+        self.setFixedWidth(380)
         self.setFixedHeight(80)
+        
+        # Vertical stack for multi-GPU awareness
+        self.layout = QVBoxLayout(self)
+        self.layout.setContentsMargins(5, 2, 5, 2)
+        self.layout.setSpacing(0)
+        
+        # Primary display row
+        self.stats_label = QLabel()
+        self.stats_label.setFont(QFont("Fixedsys Excelsior 3.01", 15))
+        self.stats_label.setStyleSheet("color: #1E1E1E;")
+        
+        # Secondary display row (Hidden if only 1 GPU is active)
+        self.gpu_extra_label = QLabel()
+        self.gpu_extra_label.setFont(QFont("Fixedsys Excelsior 3.01", 15))
+        self.gpu_extra_label.setStyleSheet("color: #1E1E1E;")
+        self.gpu_extra_label.hide()
+        
+        self.layout.addWidget(self.stats_label)
+        self.layout.addWidget(self.gpu_extra_label)
+        
         self.timer = QTimer(self)
         self.timer.timeout.connect(self.update_stats)
         self.timer.start(3000)
         self.update_stats()
 
     def get_sensor_data(self):
-        cpu, gpu, vram = "N/A", "N/A", "N/A"
+        data = {"cpu": "N/A", "gpus": [], "vram_list": []}
         try:
             output = subprocess.check_output(["sensors"], stderr=subprocess.DEVNULL).decode()
-            lines = output.split('\n')
-            for line in lines:
-                if "Tctl" in line:
-                    m = re.search(r'\+([\d\.]+)', line)
-                    if m: cpu = f"{int(float(m.group(1)))}°"
-                low_line = line.lower()
-                if "pkg" in low_line:
-                    m = re.search(r'\+([\d\.]+)', line)
-                    if m: gpu = f"{int(float(m.group(1)))}°"
-                if "vram" in low_line:
-                    m = re.search(r'\+([\d\.]+)', line)
-                    if m: vram = f"{int(float(m.group(1)))}°"
-        except: pass
-        return cpu, gpu, vram
+            
+            # CPU detection logic
+            cpu_m = re.search(r'(?:Package id 0|Tctl|Composite):\s+\+([\d\.]+)', output)
+            if cpu_m: 
+                data["cpu"] = f"{int(float(cpu_m.group(1)))}°{UNIT}"
+
+            # Driver mapping with specific keys for Temps and VRAM
+            drivers = {
+                "amdgpu-": {"temp": ["edge", "junction"], "vram": ["vram", "mem"]},
+                "xe-": {"temp": ["pkg", "Composite"], "vram": ["vram", "memory"]},
+                "i915-": {"temp": ["Composite"], "vram": ["vram"]},
+                "nouveau-": {"temp": ["gpu"], "vram": ["memory"]}
+            }
+
+            for driver, keys in drivers.items():
+                block_match = re.search(rf'{driver}.*?\n(.*?)\n\n', output, re.DOTALL)
+                if block_match:
+                    block_content = block_match.group(1)
+                    
+                    # Map GPU Temp
+                    for t_key in keys["temp"]:
+                        t_m = re.search(rf'{t_key}:\s+\+([\d\.]+)', block_content)
+                        if t_m:
+                            data["gpus"].append({
+                                "label": driver.replace("-", "").upper(),
+                                "temp": f"{int(float(t_m.group(1)))}°{UNIT}"
+                            })
+                            break
+                    
+                    # Map VRAM Temp if available in driver block
+                    for v_key in keys["vram"]:
+                        v_m = re.search(rf'{v_key}:\s+\+([\d\.]+)', block_content)
+                        if v_m:
+                            data["vram_list"].append(f"{int(float(v_m.group(1)))}°{UNIT}")
+                            break
+
+            # Nvidia Proprietary Fallback via nvidia-smi
+            try:
+                nv_out = subprocess.check_output(
+                    ["nvidia-smi", "--query-gpu=temperature.gpu", "--format=csv,noheader,nounits"], 
+                    stderr=subprocess.DEVNULL
+                ).decode().strip()
+                if nv_out:
+                    data["gpus"].append({"label": "NVIDIA", "temp": f"{nv_out}°{UNIT}"})
+            except Exception:
+                pass
+
+        except Exception:
+            pass
+        return data
 
     def update_stats(self):
-        cpu_t, gpu_t, vram_t = self.get_sensor_data()
-        self.setText(f"CPU:{cpu_t} GPU:{gpu_t} VRAM:{vram_t}")
+        d = self.get_sensor_data()
+        
+        # Build VRAM string only if data exists
+        vram_str = f" | VRAM:{d['vram_list'][0]}" if d["vram_list"] else ""
+        
+        if d["gpus"]:
+            gpu0 = d["gpus"][0]
+            self.stats_label.setText(f"CPU:{d['cpu']} | {gpu0['label']}:{gpu0['temp']}{vram_str}")
+            
+            if len(d["gpus"]) > 1:
+                gpu1 = d["gpus"][1]
+                self.gpu_extra_label.setText(f"{gpu1['label']} (GPU1):{gpu1['temp']}")
+                self.gpu_extra_label.show()
+            else:
+                self.gpu_extra_label.hide()
+        else:
+            self.stats_label.setText(f"CPU:{d['cpu']} | GPU:N/A{vram_str}")
+            self.gpu_extra_label.hide()
 
 class AnalogClock(QWidget):
     def __init__(self, parent=None):
@@ -189,7 +296,7 @@ class AnalogClock(QWidget):
 # --- UTILS ---
 
 def filter_profanity(text):
-    bad_words = ["Goddamn", "bitch", "slut", "bastard", "cock", "cocksucker", "cock-sucker", "bugger", "bullshit", "fuck", "fucked", "fucking", "fucker", "fuckers", "fucktard", "arse", "arsehead", "arsehole", "asshole", "ass", "mother-fucker", "motherfucker", "brother-fucker", "brotherfucker", "shit", "shitter", "cunt", "dick", "dick-head", "dickhead", "dumb-ass", "dumbass", "dyke", "child-fucker", "childfucker", "prick", "pussy", "pigfucker", "pig-fucker", "sister-fucker", "sisterfucker", "horseshit", "horse-shit", "tranny", "twat", "wanker", "kike", "fag", "faggot", "father-fucker", "fatherfucker", "piss", "pissed", "jack-ass", "jackass"]
+    bad_words = ["Goddamn", "bitch", "slut", "bastard", "cock", "cocksucker", "cock-sucker", "blow-job", "blowjob", "foot-job", "footjob", "tit-fuck", "titfuck", "bugger", "bullshit", "fuck", "fucked", "fucking", "fucker", "fuckers", "fucktard", "arse", "arsehead", "arsehole", "asshole", "ass", "mother-fucker", "motherfucker", "brother-fucker", "brotherfucker", "shit", "shitter", "cunt", "dick", "dick-head", "dickhead", "dumb-ass", "dumbass", "dyke", "child-fucker", "childfucker", "prick", "pussy", "pigfucker", "pig-fucker", "sister-fucker", "sisterfucker", "horseshit", "horse-shit", "tranny", "twat", "wanker", "kike", "fag", "faggot", "father-fucker", "fatherfucker", "piss", "pissed", "jack-ass", "jackass"]
     p_pattern = r"\b(" + "|".join(bad_words) + r")\w*\b"
     def replace_with_stars(m):
         word = m.group(0)
@@ -239,6 +346,7 @@ class BMOWindow(QMainWindow):
         os.environ["SDL_AUDIODRIVER"] = "pulse"
         
         self.pending_image = None
+        self.setAcceptDrops(True)
         self.is_speaking = self.is_loving = self.is_sleeping = self.is_processing = False
         self.current_anim = None
         self.memory_context = self.load_memory()
@@ -387,6 +495,22 @@ class BMOWindow(QMainWindow):
             self.crt_filter.setGeometry(self.centralWidget().rect())
         super().resizeEvent(event)
 
+    def dragEnterEvent(self, event):
+        if event.mimeData().hasUrls():
+            event.accept()
+        else:
+            event.ignore()
+
+    def dropEvent(self, event):
+        urls = event.mimeData().urls()
+        if urls:
+            file_path = urls[0].toLocalFile()
+            if file_path.lower().endswith(('.png', '.jpg', '.jpeg', '.webp')):
+                self.pending_image = file_path
+                self.chat_display.append(f"<br><b style='color:#329985;'>BMO:</b> I see <i>{os.path.basename(file_path)}</i>! What should I do, honeybun?")
+                self.signals.update_face.emit(FACE_HEARTS)
+                QTimer.singleShot(2000, lambda: self.signals.update_face.emit(FACE_IDLE))
+
     def auto_greet(self):
         quotes = [
             "Hello sugarplum, how can I assist you today?",
@@ -436,66 +560,78 @@ class BMOWindow(QMainWindow):
         try:
             start_time = time.time() 
             is_special = any(x in prompt.lower() for x in ["thanks", "love", "cute", "bravo"])
-            search_keywords = ["search", "look up", "i need the recipe", "how to", "protondb", "what is", "latest news"]
+            search_keywords = ["search", "look up", "recipe", "how to", "protondb", "what is", "latest news"]
             needs_web = any(x in prompt.lower() for x in search_keywords)
-            web_data = ""
-            if needs_web:
-                web_data = get_web_info(prompt)
-                if "ERROR" in web_data: raise ConnectionError("Net error")
+            web_data = get_web_info(prompt) if needs_web else ""
             
             if self.interrupt_event.is_set(): return
+
+            # --- System Context ---
+            try:
+                raw_data = self.sys_monitor.get_sensor_data()
+                full_unit = "Celsius" if UNIT == "C" else "Fahrenheit"
+                def clean(v): 
+                    return v.replace(f"°{UNIT}", f" degrees {full_unit}") if v != "N/A" else "unknown"
+
+                gpus_desc = " | ".join([f"{g['label']}: {clean(g['temp'])}" for g in raw_data['gpus']])
+                vram_desc = f" | VRAM: {clean(raw_data['vram_list'][0])}" if raw_data['vram_list'] else ""
+                sys_ctx = (f"[SYSTEM STATUS: RAM {get_system_health()['ram_usage']}% | "
+                           f"CPU: {clean(raw_data['cpu'])} | {gpus_desc}{vram_desc}]")
+            except Exception:
+                sys_ctx = "[SYSTEM STATUS: Nominal]"
 
             now = datetime.now()
             time_ctx = f"[SYSTEM DATE/TIME: {now.strftime('%A, %B %d, %Y %H:%M')}]"
             
-            safe_bmo_prompt = BMO_PROMPT if 'BMO_PROMPT' in globals() else ""
-            safe_memory = getattr(self, 'memory_context', "")
-            safe_web = web_data if 'web_data' in locals() and web_data else ""
+            # --- Chat Construction ---
+            selected_model = VISION_MODEL if image_path else TEXT_MODEL
+            permanent_core = get_hardcoded_memory()
             
-            context_data = f"\n{time_ctx}\n[WEB DATA]: {safe_web}" if safe_web else f"\n{time_ctx}"
+            full_system_prompt = (
+                f"{BMO_PROMPT}\n\n"
+                f"{time_ctx}\n"
+                f"{sys_ctx}\n"
+                f"{web_data}\n\n"
+                f"=== PERMANENT CORE MEMORY ===\n"
+                f"{permanent_core}\n"
+                f"=============================\n\n"
+                f"[RECENT CHAT HISTORY]\n{self.memory_context}"
+            )
+
+            messages = [
+                {'role': 'system', 'content': full_system_prompt},
+                {'role': 'user', 'content': prompt}
+            ]
+
+            if image_path and os.path.exists(image_path):
+                messages[1]['images'] = [os.path.abspath(image_path)]
             
-            vision_context = ""
-            if image_path:
-                try:
-                    with Image.open(image_path) as img:
-                        img = img.convert("RGB"); img.thumbnail((384, 384)); img_byte_arr = io.BytesIO()
-                        img.save(img_byte_arr, format='JPEG', quality=70)
-                        res_v = ollama.generate(model=VISION_MODEL, prompt="What do you see?", images=[img_byte_arr.getvalue()])
-                        vision_context = f"[IMAGE DESC: {res_v.get('response', '')}]"
-                except:
-                    vision_context = "[IMAGE ERROR]"
-
-            full_prompt = f"{safe_bmo_prompt}\n\n{context_data}\nHistory: {safe_memory}\n{vision_context}\nUser: {prompt}\nBMO:"
-
-            client = ollama.Client(host="http://localhost:11434", timeout=300.0)
-
-            res = ollama.generate(
-                model=TEXT_MODEL, 
-                prompt=full_prompt, 
+            # Ollama Calling
+            res = ollama.chat(
+                model=selected_model,
+                messages=messages,
                 options={
-                    "num_predict": 1024, 
-                    "temperature": 0.6, 
-                    "num_ctx": 4096, # Reduced context slightly for better speed
+                    "temperature": 0.4,
+                    "num_ctx": 4096,
                     "num_thread": HW_PROFILE["threads"]
                 }
             )
             
             if self.interrupt_event.is_set(): return
             
-            resp = res.get('response', "Alright, honeybun!").strip()
-            resp = re.sub(r'#.*', '', resp).split("dear:")[0].split("User:")[0].strip()
-            self.save_memory(f"User: {prompt}\nBMO: {resp}")
+            response_text = res['message']['content'].strip()
             
-            self.signals.response_ready.emit(resp, is_special)
-            duration = time.time() - start_time
-            print(f"\n[BMO PERFORMANCE] Time: {duration:.2f}s | Threads: {HW_PROFILE['threads']}")
+            # Saving Memory and UI Update
+            self.save_memory(f"User: {prompt}\nBMO: {response_text}")
+            self.signals.response_ready.emit(response_text, is_special)
+            
+            print(f"[PERFORMANCE] Time: {time.time() - start_time:.2f}s")
 
         except Exception as e:
             if not self.interrupt_event.is_set():
-                print(f"DEBUG ERROR: {e}") 
-                err_sfx = os.path.join(SFX_DIR, "critical_error.wav")
-                if os.path.exists(err_sfx): subprocess.Popen(["paplay", err_sfx])
-                self.signals.response_ready.emit("My internet brain is fuzzy, sugarplum! I cannot reach the satellites! 🔌", False)
+                logger.error(f"Inference Error: {e}")
+                traceback.print_exc()
+                self.signals.response_ready.emit("My internet brain is fuzzy, sugarplum!", False)
         finally:
             if not self.interrupt_event.is_set():
                 self.is_processing = False
@@ -703,7 +839,7 @@ class BMOWindow(QMainWindow):
         title.setAlignment(Qt.AlignmentFlag.AlignCenter)
         layout.addWidget(title)
         
-        version = QLabel("v.1.5.9 Github")
+        version = QLabel("v.1.6.0 - Github")
         version.setStyleSheet("font-size: 14px; color: #888;")
         version.setAlignment(Qt.AlignmentFlag.AlignCenter)
         layout.addWidget(version)
